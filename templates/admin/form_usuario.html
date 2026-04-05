@@ -1,0 +1,190 @@
+﻿{% extends 'base.html' %}
+{% block title %}{% if usuario %}Editar Usuário{% else %}Novo Usuário{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="d-flex align-items-center mb-4 gap-3">
+      <a href="{{ url_for('admin.gerenciar_usuarios') }}" class="btn btn-light btn-sm">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div>
+        <h3 class="fw-800 mb-0">{% if usuario %}Editar Usuário{% else %}Novo Usuário{% endif %}</h3>
+        <p class="text-muted small mb-0">{% if usuario %}{{ usuario.username }}{% else %}Cadastrar novo membro da equipe{% endif %}</p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm p-4">
+      <form method="POST" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {% if not usuario %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Usuário <span class="text-danger">*</span></label>
+          <input type="text" name="username" class="form-control"
+                 placeholder="login do usuário" required autofocus>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Senha <span class="text-danger">*</span></label>
+          <input type="password" name="password" id="senha_nova_campo" class="form-control"
+                 placeholder="Mínimo 8 caracteres" required>
+          <div id="senha_forca" class="mt-1 small"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Confirmar Senha <span class="text-danger">*</span></label>
+          <input type="password" name="password_confirm" id="senha_conf_campo" class="form-control"
+                 placeholder="Repita a senha" required>
+          <div id="senha_match" class="mt-1 small"></div>
+        </div>
+        {% endif %}
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Cargo / Perfil <span class="text-danger">*</span></label>
+          <select name="role" class="form-select" id="roleSelect" onchange="ajustarEscolaUI()">
+            <option value="auxiliar" {% if usuario and usuario.role == 'auxiliar' %}selected{% endif %}>Auxiliar</option>
+            <option value="pedagogo" {% if usuario and usuario.role == 'pedagogo' %}selected{% endif %}>Pedagogo</option>
+            <option value="admin" {% if usuario and usuario.role == 'admin' %}selected{% endif %}>Administrador</option>
+          </select>
+        </div>
+
+        {# Escola única para auxiliar #}
+        <div class="mb-3" id="escolaUnicaWrap">
+          <label class="form-label fw-semibold">Escola Vinculada</label>
+          <select name="escola_unica" class="form-select" id="escolaUnica">
+            <option value="Todas">-- Todas as escolas --</option>
+            {% for e in escolas_lista %}
+            <option value="{{ e.nome }}"
+              {% if usuario and usuario.role != 'pedagogo' and usuario.escola == e.nome %}selected{% endif %}>
+              {{ e.nome }}{% if e.cidade %} — {{ e.cidade }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <small class="text-muted">Auxiliar deve ter uma escola específica.</small>
+        </div>
+
+        {# Múltiplas escolas para pedagogo #}
+        <div class="mb-3 d-none" id="escolaMultiWrap">
+          <label class="form-label fw-semibold">Escolas Supervisionadas</label>
+          <div class="border rounded p-2" style="max-height:200px;overflow-y:auto">
+            {% for e in escolas_lista %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="escolas_pedagogo"
+                     value="{{ e.nome }}" id="esc_{{ loop.index }}"
+                     {% if usuario and usuario.role == 'pedagogo' and e.nome in (usuario.escola or '').split(',') | map('trim') | list %}checked{% endif %}>
+              <label class="form-check-label small" for="esc_{{ loop.index }}">
+                {{ e.nome }}{% if e.cidade %} — {{ e.cidade }}{% endif %}
+              </label>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="todasEscolas" onchange="toggleTodasEscolas(this)">
+            <label class="form-check-label small fw-semibold" for="todasEscolas">Acesso a todas as escolas</label>
+          </div>
+          <small class="text-muted">Selecione as escolas que este pedagogo supervisiona.</small>
+        </div>
+
+        {% if usuario %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nova Senha <small class="text-muted fw-normal">(deixe em branco para manter)</small></label>
+          <input type="password" name="nova_senha" id="senha_nova_campo" class="form-control"
+                 placeholder="Nova senha (opcional)">
+          <div id="senha_forca" class="mt-1 small"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Confirmar Nova Senha</label>
+          <input type="password" name="nova_senha_confirm" id="senha_conf_campo" class="form-control"
+                 placeholder="Repita a nova senha">
+          <div id="senha_match" class="mt-1 small"></div>
+        </div>
+        <div class="mb-4">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="ativo" id="ativoCheck"
+                   {% if usuario.ativo %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="ativoCheck">Conta ativa</label>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="alert alert-info py-2 px-3 small mb-3">
+          <i class="bi bi-shield-lock me-1"></i>
+          Senha deve ter: mínimo 8 caracteres, uma maiúscula, um número e um caractere especial.
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-grow-1 fw-bold">
+            <i class="bi bi-check-lg me-2"></i>{% if usuario %}Salvar Alterações{% else %}Cadastrar Usuário{% endif %}
+          </button>
+          <a href="{{ url_for('admin.gerenciar_usuarios') }}" class="btn btn-outline-secondary">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function ajustarEscolaUI() {
+  const role = document.getElementById('roleSelect').value;
+  const unico = document.getElementById('escolaUnicaWrap');
+  const multi = document.getElementById('escolaMultiWrap');
+  if (role === 'pedagogo') {
+    unico.classList.add('d-none');
+    multi.classList.remove('d-none');
+  } else {
+    unico.classList.remove('d-none');
+    multi.classList.add('d-none');
+  }
+}
+
+function toggleTodasEscolas(cb) {
+  document.querySelectorAll('input[name="escolas_pedagogo"]').forEach(el => {
+    el.checked = cb.checked;
+  });
+}
+
+function verificarForca(senha) {
+  const el = document.getElementById('senha_forca');
+  if (!el || !senha) { if(el) el.textContent=''; return; }
+  let pontos = 0;
+  if (senha.length >= 8) pontos++;
+  if (/[A-Z]/.test(senha)) pontos++;
+  if (/[0-9]/.test(senha)) pontos++;
+  if (/[^A-Za-z0-9]/.test(senha)) pontos++;
+  const niveis = ['', 'Fraca', 'Razoável', 'Boa', 'Forte'];
+  const cores  = ['', 'text-danger', 'text-warning', 'text-primary', 'text-success'];
+  el.textContent = pontos > 0 ? 'Força: ' + niveis[pontos] : '';
+  el.className = 'mt-1 small ' + (cores[pontos] || '');
+}
+
+function verificarMatch() {
+  const el = document.getElementById('senha_match');
+  if (!el) return;
+  const a = document.getElementById('senha_nova_campo')?.value || '';
+  const b = document.getElementById('senha_conf_campo')?.value || '';
+  if (!b) { el.textContent = ''; return; }
+  if (a === b) {
+    el.textContent = '✓ Senhas coincidem';
+    el.className = 'mt-1 small text-success';
+  } else {
+    el.textContent = '✗ Senhas não coincidem';
+    el.className = 'mt-1 small text-danger';
+  }
+}
+
+document.getElementById('senha_nova_campo')?.addEventListener('input', function() {
+  verificarForca(this.value);
+  verificarMatch();
+});
+document.getElementById('senha_conf_campo')?.addEventListener('input', verificarMatch);
+
+ajustarEscolaUI();
+
+// Marcar "todas" se escola atual for "Todas"
+{% if usuario and usuario.role == 'pedagogo' and usuario.escola == 'Todas' %}
+document.getElementById('todasEscolas').checked = true;
+toggleTodasEscolas(document.getElementById('todasEscolas'));
+{% endif %}
+</script>
+{% endblock %}

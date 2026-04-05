@@ -1,0 +1,87 @@
+﻿{% extends 'base.html' %} {% block title %}Trocar Senha{% endblock %} {% block
+content %}
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="d-flex align-items-center mb-4">
+      <a href="{{ url_for('main.index') }}" class="btn btn-light btn-sm me-3">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h3 class="fw-800 mb-0">Trocar Senha</h3>
+    </div>
+    <div class="card shadow-sm border-0 p-4">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Senha Atual</label>
+          <input
+            type="password"
+            name="senha_atual"
+            class="form-control"
+            required
+          />
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nova Senha</label>
+          <input
+            type="password"
+            name="nova_senha"
+            id="nova"
+            class="form-control"
+            minlength="8"
+            required
+          />
+          <div id="forca" class="mt-1 small"></div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Confirmar Nova Senha</label>
+          <input
+            type="password"
+            name="confirmacao"
+            id="conf"
+            class="form-control"
+            minlength="8"
+            required
+          />
+          <div class="form-text" id="matchMsg"></div>
+        </div>
+        <div class="alert alert-info py-2 px-3 small mb-3">
+          <i class="bi bi-shield-lock me-1"></i>
+          Mínimo 8 caracteres, uma maiúscula, um número e um caractere especial.
+        </div>
+        <button type="submit" class="btn btn-primary w-100 fw-bold">
+          <i class="bi bi-key me-2"></i>Salvar Nova Senha
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  function checkMatch() {
+    const msg = document.getElementById("matchMsg");
+    if (document.getElementById("nova").value === document.getElementById("conf").value) {
+      msg.textContent = "✓ Senhas coincidem";
+      msg.className = "form-text text-success";
+    } else {
+      msg.textContent = "✗ Senhas não coincidem";
+      msg.className = "form-text text-danger";
+    }
+  }
+  function checkForca(senha) {
+    const el = document.getElementById("forca");
+    let p = 0;
+    if (senha.length >= 8) p++;
+    if (/[A-Z]/.test(senha)) p++;
+    if (/[0-9]/.test(senha)) p++;
+    if (/[^A-Za-z0-9]/.test(senha)) p++;
+    const n = ['','Fraca','Razoável','Boa','Forte'];
+    const c = ['','text-danger','text-warning','text-primary','text-success'];
+    el.textContent = senha ? 'Força: ' + n[p] : '';
+    el.className = 'mt-1 small ' + (c[p] || '');
+  }
+  document.getElementById("nova").addEventListener("input", function() {
+    checkForca(this.value); checkMatch();
+  });
+  document.getElementById("conf").addEventListener("input", checkMatch);
+</script>
+{% endblock %}

@@ -1,0 +1,157 @@
+﻿{% extends 'base.html' %}
+{% block title %}Meu Perfil{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6">
+
+    <div class="d-flex align-items-center mb-4 gap-3">
+      <a href="{{ url_for('main.index') }}" class="btn btn-light btn-sm">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div>
+        <h3 class="fw-800 mb-0">Meu Perfil</h3>
+        <p class="text-muted small mb-0">@{{ user.username }}</p>
+      </div>
+    </div>
+
+    {# ── CARD DE IDENTIDADE ── #}
+    <div class="card border-0 shadow-sm p-4 mb-3">
+      <div class="d-flex align-items-center gap-3 mb-4">
+        <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white fw-800"
+             style="width:56px;height:56px;font-size:1.4rem;flex-shrink:0">
+          {{ (user.nome_exibicao or user.username)[0]|upper }}
+        </div>
+        <div>
+          <div class="fw-bold fs-5">{{ user.nome_display }}</div>
+          <span class="badge {% if user.role == 'admin' %}badge-admin{% elif user.role == 'pedagogo' %}badge-pedagogo{% else %}badge-auxiliar{% endif %}">
+            {{ user.role|capitalize }}
+          </span>
+          {% if user.escola and user.escola != 'Todas' %}
+          <span class="text-muted small ms-2">
+            <i class="bi bi-building me-1"></i>{{ user.escola }}
+          </span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="row g-2 text-muted small mb-1">
+        <div class="col-6">
+          <i class="bi bi-person me-1"></i>
+          <span>Membro desde {{ user.criado_em.strftime('%d/%m/%Y') if user.criado_em else '—' }}</span>
+        </div>
+        <div class="col-6">
+          <i class="bi bi-clock me-1"></i>
+          <span>Último acesso {{ user.ultimo_login.strftime('%d/%m/%Y %H:%M') if user.ultimo_login else '—' }}</span>
+        </div>
+      </div>
+    </div>
+
+    {# ── DADOS PESSOAIS ── #}
+    <div class="card border-0 shadow-sm p-4 mb-3">
+      <h5 class="fw-bold mb-3"><i class="bi bi-person-lines-fill me-2 text-primary"></i>Dados Pessoais</h5>
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="acao" value="dados">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nome de exibição</label>
+          <input type="text" name="nome_exibicao" class="form-control"
+                 value="{{ user.nome_exibicao or '' }}"
+                 placeholder="Como você quer ser chamado">
+          <div class="form-text">Aparece no sistema no lugar do username.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">E-mail</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+            <input type="email" name="email" class="form-control"
+                   value="{{ user.email or '' }}"
+                   placeholder="seu@email.com">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold text-muted">Login (não editável)</label>
+          <input type="text" class="form-control bg-light" value="{{ user.username }}" disabled>
+        </div>
+
+        <button type="submit" class="btn btn-primary fw-bold">
+          <i class="bi bi-check-lg me-2"></i>Salvar Dados
+        </button>
+      </form>
+    </div>
+
+    {# ── ALTERAR SENHA ── #}
+    <div class="card border-0 shadow-sm p-4">
+      <h5 class="fw-bold mb-3"><i class="bi bi-shield-lock me-2 text-warning"></i>Alterar Senha</h5>
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="acao" value="senha">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Senha Atual</label>
+          <input type="password" name="senha_atual" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nova Senha</label>
+          <input type="password" name="nova_senha" id="nova" class="form-control" minlength="8" required>
+          <div id="forca" class="mt-1 small"></div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Confirmar Nova Senha</label>
+          <input type="password" name="confirmacao" id="conf" class="form-control" minlength="8" required>
+          <div id="matchMsg" class="mt-1 small"></div>
+        </div>
+
+        <div class="alert alert-info py-2 px-3 small mb-3">
+          <i class="bi bi-shield-lock me-1"></i>
+          Mínimo 8 caracteres, uma maiúscula, um número e um caractere especial.
+        </div>
+
+        <button type="submit" class="btn btn-warning fw-bold text-dark">
+          <i class="bi bi-key me-2"></i>Alterar Senha
+        </button>
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function checkForca(senha) {
+  const el = document.getElementById('forca');
+  let p = 0;
+  if (senha.length >= 8) p++;
+  if (/[A-Z]/.test(senha)) p++;
+  if (/[0-9]/.test(senha)) p++;
+  if (/[^A-Za-z0-9]/.test(senha)) p++;
+  const n = ['','Fraca','Razoável','Boa','Forte'];
+  const c = ['','text-danger','text-warning','text-primary','text-success'];
+  el.textContent = senha ? 'Força: ' + n[p] : '';
+  el.className = 'mt-1 small ' + (c[p] || '');
+}
+function checkMatch() {
+  const el = document.getElementById('matchMsg');
+  const a = document.getElementById('nova').value;
+  const b = document.getElementById('conf').value;
+  if (!b) { el.textContent = ''; return; }
+  if (a === b) {
+    el.textContent = '✓ Senhas coincidem';
+    el.className = 'mt-1 small text-success';
+  } else {
+    el.textContent = '✗ Senhas não coincidem';
+    el.className = 'mt-1 small text-danger';
+  }
+}
+document.getElementById('nova').addEventListener('input', function() {
+  checkForca(this.value); checkMatch();
+});
+document.getElementById('conf').addEventListener('input', checkMatch);
+</script>
+{% endblock %}

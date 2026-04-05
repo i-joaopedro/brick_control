@@ -1,0 +1,237 @@
+﻿{% extends 'base.html' %}
+{% block title %}Composição — {{ modelo.nome }}{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin.listar_modelos') }}">Modelos</a></li>
+    <li class="breadcrumb-item active">{{ modelo.nome }}</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+    <a href="{{ url_for('admin.listar_modelos') }}" class="btn btn-light btn-sm me-3">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+        <h2 class="fw-800 mb-0">Composição: {{ modelo.nome }}</h2>
+        <p class="text-muted small mb-0">
+            <span id="total-pecas">{{ modelo.pecas_obrigatorias|length }}</span> peças configuradas
+        </p>
+    </div>
+</div>
+
+<div class="row g-4">
+    {# ── PAINEL ADICIONAR ── #}
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-4 sticky-top" style="top:70px">
+            <h5 class="fw-bold mb-3"><i class="bi bi-plus-circle me-2 text-primary"></i>Vincular Peça</h5>
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Selecionar Peça</label>
+                    <select name="peca_id" id="peca-select" class="form-select" required>
+                        <option value="">Escolha uma peça...</option>
+                        {% for p in pecas_catalogo %}
+                        <option value="{{ p.id }}"
+                                data-img="{{ url_for('static', filename='uploads/' + p.imagem_url) }}"
+                                data-nome="{{ p.nome }}">
+                            {{ p.codigo_lego }} — {{ p.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Prévia da peça selecionada #}
+                <div id="peca-preview" class="mb-3 d-none">
+                    <div class="d-flex align-items-center gap-3 p-2 bg-light rounded border">
+                        <img id="peca-preview-img" src="" alt=""
+                             style="width:56px;height:56px;object-fit:contain;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:3px">
+                        <span id="peca-preview-nome" class="small fw-semibold text-truncate"></span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Quantidade</label>
+                    <input type="number" name="quantidade" class="form-control"
+                           value="1" min="1" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 fw-bold">
+                    <i class="bi bi-plus-circle me-2"></i>Adicionar ao Kit
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {# ── LISTA DE PEÇAS DO KIT ── #}
+    <div class="col-md-8">
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th style="width:56px">Foto</th>
+                            <th>Código</th>
+                            <th>Nome</th>
+                            <th class="text-center" style="width:150px">Quantidade</th>
+                            <th class="text-end" style="width:60px">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in modelo.pecas_obrigatorias %}
+                        <tr id="row-item-{{ item.id }}">
+                            <td class="py-1">
+                                <img src="{{ url_for('static', filename='uploads/' + item.peca.imagem_url) }}"
+                                     class="rounded" width="44" height="44"
+                                     style="object-fit:contain;background:#f8f9fa;border:1px solid #e2e8f0;padding:2px"
+                                     onerror="this.src='https://placehold.co/44x44/f1f5f9/94a3b8?text=?'">
+                            </td>
+                            <td><code class="small text-muted">{{ item.peca.codigo_lego }}</code></td>
+                            <td class="fw-semibold small">{{ item.peca.nome }}</td>
+
+                            {# ── CONTROLE +/- (AJAX) ── #}
+                            <td class="text-center">
+                                <div class="d-flex align-items-center justify-content-center gap-1">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary px-2 py-0 btn-qtd"
+                                            data-item-id="{{ item.id }}"
+                                            data-acao="decrementar"
+                                            title="Diminuir quantidade">
+                                        <i class="bi bi-dash-lg"></i>
+                                    </button>
+                                    <span class="badge bg-primary fs-6 px-3 py-1 qtd-badge"
+                                          id="qtd-{{ item.id }}"
+                                          style="min-width:2.5rem">
+                                        {{ item.quantidade_esperada }}
+                                    </span>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary px-2 py-0 btn-qtd"
+                                            data-item-id="{{ item.id }}"
+                                            data-acao="incrementar"
+                                            title="Aumentar quantidade">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                </div>
+                            </td>
+
+                            <td class="text-end">
+                                <form method="POST"
+                                      action="{{ url_for('admin.remover_item_composicao', item_id=item.id) }}"
+                                      onsubmit="return confirm('Remover esta peça do kit?')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-sm btn-outline-danger" title="Remover peça">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr id="empty-row">
+                            <td colspan="5" class="text-center text-muted py-5">
+                                <i class="bi bi-inbox" style="font-size:2rem"></i>
+                                <p class="mt-2 mb-0">Nenhuma peça adicionada ainda.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Prévia da peça selecionada ─────────────────────────────────
+document.getElementById('peca-select').addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    const preview = document.getElementById('peca-preview');
+    if (!opt.value) {
+        preview.classList.add('d-none');
+        return;
+    }
+    document.getElementById('peca-preview-img').src  = opt.dataset.img;
+    document.getElementById('peca-preview-nome').textContent = opt.dataset.nome;
+    preview.classList.remove('d-none');
+});
+
+// ── CSRF token helper ──────────────────────────────────────────
+function getCsrfToken() {
+    // Lê o valor do campo csrf_token do primeiro formulário da página
+    const field = document.querySelector('input[name="csrf_token"]');
+    return field ? field.value : '';
+}
+
+// ── Toast de feedback ──────────────────────────────────────────
+function showToast(msg, tipo) {
+    const old = document.getElementById('qtd-toast');
+    if (old) old.remove();
+    const div = document.createElement('div');
+    div.id = 'qtd-toast';
+    div.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;min-width:220px';
+    div.innerHTML = `
+      <div class="toast align-items-center text-white bg-${tipo} border-0 show" role="alert">
+        <div class="d-flex">
+          <div class="toast-body fw-semibold">${msg}</div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+      </div>`;
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), 2500);
+}
+
+// ── Ajuste de quantidade via AJAX ──────────────────────────────
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.btn-qtd');
+    if (!btn) return;
+
+    const itemId = btn.dataset.itemId;
+    const acao   = btn.dataset.acao;
+    const badge  = document.getElementById('qtd-' + itemId);
+
+    // Feedback visual imediato (otimista)
+    const atual = parseInt(badge.textContent.trim(), 10);
+    if (acao === 'decrementar' && atual <= 1) {
+        showToast('Quantidade mínima é 1.', 'danger');
+        return;
+    }
+
+    // Desabilitar botões para evitar duplo-clique
+    const botoesLinha = btn.closest('tr').querySelectorAll('.btn-qtd');
+    botoesLinha.forEach(b => b.disabled = true);
+
+    fetch(`/api/composicao/${itemId}/quantidade`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({ acao: acao })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.erro) {
+            showToast(data.erro, 'danger');
+        } else {
+            badge.textContent = data.quantidade;
+            // Animação de pulso no badge
+            badge.classList.remove('bg-primary');
+            badge.classList.add('bg-success');
+            setTimeout(() => {
+                badge.classList.remove('bg-success');
+                badge.classList.add('bg-primary');
+            }, 600);
+            showToast(`Quantidade atualizada: ${data.quantidade}`, 'success');
+        }
+    })
+    .catch(() => {
+        showToast('Erro de conexão. Tente novamente.', 'danger');
+    })
+    .finally(() => {
+        botoesLinha.forEach(b => b.disabled = false);
+    });
+});
+</script>
+{% endblock %}

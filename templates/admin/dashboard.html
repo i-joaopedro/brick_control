@@ -1,0 +1,198 @@
+﻿{% extends 'base.html' %}
+{% block title %}Dashboard — Brick Control{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-800 mb-0">Painel de Controle</h2>
+    <p class="text-muted mb-0 small">Visão geral do Brick Control educacional</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin.novo_modelo') }}" class="btn btn-outline-primary btn-sm fw-semibold">
+      <i class="bi bi-plus-square me-1"></i>Novo Modelo
+    </a>
+    <a href="{{ url_for('admin.nova_unidade') }}" class="btn btn-primary btn-sm fw-semibold">
+      <i class="bi bi-box-seam me-1"></i>Nova Unidade
+    </a>
+  </div>
+</div>
+
+{# ── FILTRO DE CIDADE ── #}
+{% if cidades|length > 1 %}
+<div class="mb-4 d-flex flex-wrap gap-2 align-items-center">
+  <span class="small text-muted fw-semibold me-1"><i class="bi bi-geo-alt me-1"></i>Filtrar por cidade:</span>
+  <a href="{{ url_for('admin.dashboard') }}"
+     class="btn btn-sm {% if not cidade_filtro %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+    Todas
+  </a>
+  {% for cidade in cidades %}
+  <a href="{{ url_for('admin.dashboard', cidade=cidade) }}"
+     class="btn btn-sm {% if cidade_filtro == cidade %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+    {{ cidade }}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── MÉTRICAS GLOBAIS ── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small mb-1">Total de Kits</div>
+      <div class="fw-800 fs-3">{{ total }}</div>
+      <div class="small text-muted"><i class="bi bi-building me-1"></i>{{ escolas_distintas }} escolas</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card success p-3">
+      <div class="text-muted small mb-1">Completos</div>
+      <div class="fw-800 fs-3 text-success">{{ completos }}</div>
+      <div class="small text-muted">
+        {% if total > 0 %}{{ (completos/total*100)|round(0)|int }}%{% else %}—{% endif %} do total
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card danger p-3">
+      <div class="text-muted small mb-1">Incompletos</div>
+      <div class="fw-800 fs-3 text-danger">{{ incompletos }}</div>
+      <div class="small text-muted">Precisam atenção</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('main.conferencias_pendentes') }}" class="text-decoration-none">
+    <div class="card stat-card warning p-3" style="cursor:pointer">
+      <div class="text-muted small mb-1">Pendentes</div>
+      <div class="fw-800 fs-3 text-warning">{{ pendentes }}</div>
+      <div class="small text-muted">Sem conferência</div>
+    </div>
+    </a>
+  </div>
+</div>
+
+{# ── VISÃO POR CIDADE ── #}
+{% if cidades_data %}
+<h5 class="fw-bold mb-3">
+  <i class="bi bi-geo-alt me-2 text-primary"></i>
+  {% if cidade_filtro %}{{ cidade_filtro }}{% else %}Visão por Cidade{% endif %}
+</h5>
+
+{% for cidade, dados in cidades_data.items() %}
+{% if not cidade_filtro or cidade_filtro == cidade %}
+<div class="card border-0 shadow-sm mb-3">
+  {# Cabeçalho da cidade #}
+  <div class="card-header bg-white border-0 py-3 px-4 d-flex justify-content-between align-items-center"
+       style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#cidade_{{ loop.index }}">
+    <div class="d-flex align-items-center gap-3">
+      <i class="bi bi-chevron-down text-muted small"></i>
+      <div>
+        <span class="fw-bold">{{ cidade }}</span>
+        <span class="text-muted small ms-2">{{ dados.escolas|length }} escola{{ 's' if dados.escolas|length != 1 }}</span>
+      </div>
+    </div>
+    <div class="d-flex gap-3 align-items-center">
+      <span class="small text-muted">{{ dados.total }} kits</span>
+      {% if dados.total > 0 %}
+      <div class="progress d-none d-md-flex" style="width:100px;height:8px">
+        <div class="progress-bar bg-success" style="width:{{ (dados.completos/dados.total*100)|round(0)|int }}%"></div>
+        <div class="progress-bar bg-danger" style="width:{{ (dados.incompletos/dados.total*100)|round(0)|int }}%"></div>
+        <div class="progress-bar bg-warning" style="width:{{ (dados.pendentes/dados.total*100)|round(0)|int }}%"></div>
+      </div>
+      <span class="badge {% if dados.incompletos == 0 and dados.pendentes == 0 %}bg-success{% elif dados.incompletos > 0 %}bg-danger{% else %}bg-warning text-dark{% endif %} small">
+        {{ (dados.completos/dados.total*100)|round(0)|int }}% ok
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Escolas da cidade #}
+  <div class="collapse show" id="cidade_{{ loop.index }}">
+    <div class="card-body p-0">
+      <div class="row g-0">
+        {% for escola_data in dados.escolas %}
+        {% set e = escola_data.obj %}
+        <div class="col-md-6 col-lg-4 p-3 border-top">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <a href="{{ url_for('admin.detalhe_escola', nome_escola=e.nome) }}"
+                 class="fw-semibold text-decoration-none text-dark">{{ e.nome }}</a>
+              {% if e.responsavel %}
+              <div class="small text-muted">{{ e.responsavel }}</div>
+              {% endif %}
+            </div>
+            <span class="badge {% if escola_data.incompletos == 0 and escola_data.pendentes == 0 %}bg-success
+                               {% elif escola_data.incompletos > 0 %}bg-danger
+                               {% else %}bg-warning text-dark{% endif %} ms-2">
+              {{ escola_data.completos }}/{{ escola_data.total }}
+            </span>
+          </div>
+          {% if escola_data.total > 0 %}
+          <div class="progress mb-1" style="height:5px">
+            <div class="progress-bar bg-success" style="width:{{ (escola_data.completos/escola_data.total*100)|round(0)|int }}%"></div>
+            <div class="progress-bar bg-danger"  style="width:{{ (escola_data.incompletos/escola_data.total*100)|round(0)|int }}%"></div>
+            <div class="progress-bar bg-warning" style="width:{{ (escola_data.pendentes/escola_data.total*100)|round(0)|int }}%"></div>
+          </div>
+          <div class="d-flex justify-content-between">
+            <small class="text-muted">
+              {% if escola_data.saude is not none %}saúde {{ escola_data.saude }}%{% endif %}
+            </small>
+            <a href="{{ url_for('admin.detalhe_escola', nome_escola=e.nome) }}"
+               class="small text-primary text-decoration-none">Ver detalhes →</a>
+          </div>
+          {% else %}
+          <small class="text-muted">Nenhum kit cadastrado</small>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{# ── MODELOS ── #}
+<div class="d-flex justify-content-between align-items-center mb-3 mt-4">
+  <h5 class="fw-bold mb-0">Modelos de Kit</h5>
+  <a href="{{ url_for('admin.listar_modelos') }}" class="btn btn-outline-secondary btn-sm">Ver todos</a>
+</div>
+<div class="row g-3 mb-5">
+  {% for m in modelos %}
+  <div class="col-xl-3 col-lg-4 col-md-6">
+    <div class="card h-100 p-3">
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <img src="{{ url_for('static', filename='uploads/' + m.foto_capa) }}"
+             class="rounded" style="width:56px;height:56px;object-fit:cover;"
+             onerror="this.src='https://placehold.co/56x56?text=KIT'">
+        <div>
+          <h6 class="fw-bold mb-0">{{ m.nome }}</h6>
+          <span class="badge bg-light text-dark border small">{{ m.categoria or 'Sem categoria' }}</span>
+        </div>
+      </div>
+      <div class="d-flex justify-content-between text-muted small mb-3">
+        <span><i class="bi bi-puzzle me-1"></i>{{ m.pecas_obrigatorias|length }} peças</span>
+        <span><i class="bi bi-box-seam me-1"></i>{{ m.unidades_reais|length }} unidades</span>
+      </div>
+      <div class="d-flex gap-2 mt-auto">
+        <a href="{{ url_for('admin.gerenciar_composicao', modelo_id=m.id) }}"
+           class="btn btn-sm btn-outline-primary flex-grow-1">
+          <i class="bi bi-list-check"></i> Peças
+        </a>
+        <a href="{{ url_for('admin.editar_modelo', mid=m.id) }}"
+           class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-pencil"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12 text-center py-5">
+    <i class="bi bi-box text-muted" style="font-size:3rem"></i>
+    <p class="text-muted mt-2">Nenhum modelo cadastrado ainda.</p>
+    <a href="{{ url_for('admin.novo_modelo') }}" class="btn btn-primary">Criar primeiro modelo</a>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

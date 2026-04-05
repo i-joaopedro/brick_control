@@ -1,0 +1,327 @@
+﻿{% extends 'base.html' %}
+{% block title %}Conferências Pendentes{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-800 mb-0">Conferências Pendentes</h2>
+    <p class="text-muted small mb-0">Kits que não foram conferidos recentemente</p>
+  </div>
+  <form method="GET" class="d-flex align-items-center gap-2">
+    {% if cidade_filtro %}
+    <input type="hidden" name="cidade" value="{{ cidade_filtro }}">
+    {% endif %}
+    <label class="text-muted small fw-semibold">Pendente após:</label>
+    <select name="dias" class="form-select form-select-sm" style="width:120px" onchange="this.form.submit()">
+      {% for d in [7, 14, 30, 60, 90] %}
+      <option value="{{ d }}" {% if d == dias %}selected{% endif %}>{{ d }} dias</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+{# FILTRO DE CIDADE — só admin/pedagogo #}
+{% if is_admin and cidades|length > 1 %}
+<div class="mb-4 d-flex flex-wrap gap-2 align-items-center">
+  <span class="small text-muted fw-semibold me-1"><i class="bi bi-geo-alt me-1"></i>Cidade:</span>
+  <a href="{{ url_for('main.conferencias_pendentes', dias=dias) }}"
+     class="btn btn-sm {% if not cidade_filtro %}btn-primary{% else %}btn-outline-secondary{% endif %}">Todas</a>
+  {% for cidade in cidades %}
+  <a href="{{ url_for('main.conferencias_pendentes', dias=dias, cidade=cidade) }}"
+     class="btn btn-sm {% if cidade_filtro == cidade %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+    {{ cidade }}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# MÉTRICAS #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3 text-center">
+      <div class="fw-800 fs-2">{{ total }}</div>
+      <div class="small text-muted">Total de kits</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card danger p-3 text-center">
+      <div class="fw-800 fs-2 text-danger">{{ nunca|length }}</div>
+      <div class="small text-muted">Nunca conferidos</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card warning p-3 text-center">
+      <div class="fw-800 fs-2 text-warning">{{ atrasados|length }}</div>
+      <div class="small text-muted">Atrasados (+{{ dias }}d)</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card success p-3 text-center">
+      <div class="fw-800 fs-2 text-success">{{ ok|length }}</div>
+      <div class="small text-muted">Em dia</div>
+    </div>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════
+   VISÃO ADMIN/PEDAGOGO — agrupado por escola
+   ═══════════════════════════════════════════ #}
+{% if is_admin %}
+
+  {# NUNCA CONFERIDOS — agrupado #}
+  {% if nunca_grupos %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header border-0 bg-danger bg-opacity-10 py-2 px-3 d-flex align-items-center">
+      <i class="bi bi-x-circle-fill text-danger me-2"></i>
+      <strong class="text-danger">Nunca Conferidos</strong>
+      <span class="badge bg-danger ms-2">{{ nunca|length }} kits</span>
+      <span class="text-muted small ms-2">em {{ nunca_grupos|length }} escola{{ 's' if nunca_grupos|length != 1 }}</span>
+    </div>
+    {% for escola, kits in nunca_grupos.items() %}
+    <div class="border-top">
+      <div class="d-flex justify-content-between align-items-center px-3 py-2"
+           style="cursor:pointer" data-bs-toggle="collapse"
+           data-bs-target="#nunca_{{ loop.index }}">
+        <div>
+          <span class="fw-semibold small">{{ escola }}</span>
+          {% if escola_cidade.get(escola) %}
+          <span class="text-muted small ms-2">{{ escola_cidade[escola] }}</span>
+          {% endif %}
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-danger">{{ kits|length }} kit{{ 's' if kits|length != 1 }}</span>
+          <a href="{{ url_for('admin.detalhe_escola', nome_escola=escola) }}"
+             class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()">
+            <i class="bi bi-building"></i>
+          </a>
+          <i class="bi bi-chevron-down text-muted small"></i>
+        </div>
+      </div>
+      <div class="collapse" id="nunca_{{ loop.index }}">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for u in kits %}
+            <tr>
+              <td class="ps-4 fw-semibold small">{{ u.identificador }}</td>
+              <td class="small text-muted">{{ u.modelo.nome if u.modelo else '—' }}</td>
+              <td class="text-end pe-3">
+                <a href="{{ url_for('auxiliar.conferir_kit', kit_id=u.id) }}"
+                   class="btn btn-danger btn-sm">Conferir</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# ATRASADOS — agrupado #}
+  {% if atrasados_grupos %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header border-0 bg-warning bg-opacity-10 py-2 px-3 d-flex align-items-center">
+      <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+      <strong class="text-warning">Atrasados — mais de {{ dias }} dias</strong>
+      <span class="badge bg-warning text-dark ms-2">{{ atrasados|length }} kits</span>
+      <span class="text-muted small ms-2">em {{ atrasados_grupos|length }} escola{{ 's' if atrasados_grupos|length != 1 }}</span>
+    </div>
+    {% for escola, items in atrasados_grupos.items() %}
+    {% set max_dias = items | map(attribute='dias') | max %}
+    <div class="border-top">
+      <div class="d-flex justify-content-between align-items-center px-3 py-2"
+           style="cursor:pointer" data-bs-toggle="collapse"
+           data-bs-target="#atrasado_{{ loop.index }}">
+        <div>
+          <span class="fw-semibold small">{{ escola }}</span>
+          {% if escola_cidade.get(escola) %}
+          <span class="text-muted small ms-2">{{ escola_cidade[escola] }}</span>
+          {% endif %}
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge {% if max_dias > 60 %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+            {{ items|length }} kit{{ 's' if items|length != 1 }} · até {{ max_dias }}d
+          </span>
+          <a href="{{ url_for('admin.detalhe_escola', nome_escola=escola) }}"
+             class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()">
+            <i class="bi bi-building"></i>
+          </a>
+          <i class="bi bi-chevron-down text-muted small"></i>
+        </div>
+      </div>
+      <div class="collapse" id="atrasado_{{ loop.index }}">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for item in items %}
+            {% set u = item.unidade %}
+            <tr>
+              <td class="ps-4 fw-semibold small">{{ u.identificador }}</td>
+              <td class="small text-muted">{{ u.modelo.nome if u.modelo else '—' }}</td>
+              <td class="text-center">
+                <span class="badge {% if item.dias > 60 %}bg-danger{% elif item.dias > 30 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                  {{ item.dias }}d
+                </span>
+              </td>
+              <td class="text-end pe-3">
+                <a href="{{ url_for('auxiliar.conferir_kit', kit_id=u.id) }}"
+                   class="btn btn-warning btn-sm me-1">Conferir</a>
+                <a href="{{ url_for('auxiliar.historico_kit_auxiliar', kit_id=u.id) }}"
+                   class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-clock-history"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# EM DIA — só contagem por escola, colapsado #}
+  {% if ok %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header border-0 bg-success bg-opacity-10 py-2 px-3 d-flex align-items-center"
+         style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#okCollapse">
+      <i class="bi bi-check-circle-fill text-success me-2"></i>
+      <strong class="text-success">Em Dia</strong>
+      <span class="badge bg-success ms-2">{{ ok|length }} kits</span>
+      <i class="bi bi-chevron-down ms-auto text-muted small"></i>
+    </div>
+    <div class="collapse" id="okCollapse">
+      <div class="p-3">
+        {% set ok_por_escola = {} %}
+        {% for u in ok %}
+          {% if u.escola not in ok_por_escola %}{% set _ = ok_por_escola.update({u.escola: []}) %}{% endif %}
+          {% set _ = ok_por_escola[u.escola].append(u) %}
+        {% endfor %}
+        <div class="row g-2">
+          {% for escola, kits in ok_por_escola.items() %}
+          <div class="col-md-4 col-lg-3">
+            <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+              <span class="small fw-semibold text-truncate">{{ escola }}</span>
+              <span class="badge bg-success ms-2">{{ kits|length }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+{# ═══════════════════════════════════════════
+   VISÃO AUXILIAR — lista direta
+   ═══════════════════════════════════════════ #}
+{% else %}
+
+  {% if nunca %}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header border-0 bg-danger bg-opacity-10 d-flex align-items-center py-2 px-3">
+      <i class="bi bi-x-circle-fill text-danger me-2"></i>
+      <strong class="text-danger">Nunca Conferidos</strong>
+      <span class="badge bg-danger ms-2">{{ nunca|length }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+          {% for u in nunca %}
+          <tr>
+            <td class="fw-semibold ps-3">{{ u.identificador }}</td>
+            <td class="small text-muted">{{ u.modelo.nome if u.modelo else '—' }}</td>
+            <td class="text-end pe-3">
+              <a href="{{ url_for('auxiliar.conferir_kit', kit_id=u.id) }}"
+                 class="btn btn-danger btn-sm">Conferir</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if atrasados %}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header border-0 bg-warning bg-opacity-10 d-flex align-items-center py-2 px-3">
+      <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+      <strong class="text-warning">Atrasados — mais de {{ dias }} dias</strong>
+      <span class="badge bg-warning text-dark ms-2">{{ atrasados|length }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+          {% for item in atrasados %}{% set u = item.unidade %}
+          <tr>
+            <td class="fw-semibold ps-3">{{ u.identificador }}</td>
+            <td class="small text-muted">{{ u.modelo.nome if u.modelo else '—' }}</td>
+            <td class="text-center">
+              <span class="badge {% if item.dias > 60 %}bg-danger{% elif item.dias > 30 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                {{ item.dias }}d
+              </span>
+            </td>
+            <td class="text-end pe-3">
+              <a href="{{ url_for('auxiliar.conferir_kit', kit_id=u.id) }}"
+                 class="btn btn-warning btn-sm me-1">Conferir</a>
+              <a href="{{ url_for('auxiliar.historico_kit_auxiliar', kit_id=u.id) }}"
+                 class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-clock-history"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if ok %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-header border-0 bg-success bg-opacity-10 d-flex align-items-center py-2 px-3"
+         style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#okCollapse">
+      <i class="bi bi-check-circle-fill text-success me-2"></i>
+      <strong class="text-success">Em Dia</strong>
+      <span class="badge bg-success ms-2">{{ ok|length }}</span>
+      <i class="bi bi-chevron-down ms-auto text-muted small"></i>
+    </div>
+    <div class="collapse" id="okCollapse">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <tbody>
+            {% for u in ok %}
+            <tr>
+              <td class="fw-semibold ps-3">{{ u.identificador }}</td>
+              <td class="small text-muted">
+                {{ u.ultima_conferencia.data_conferencia.strftime('%d/%m/%Y') if u.ultima_conferencia else '—' }}
+              </td>
+              <td class="text-center">
+                {% if u.saude_percentual is not none %}
+                <span class="badge {% if u.saude_percentual >= 90 %}bg-success{% elif u.saude_percentual >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                  {{ u.saude_percentual }}%
+                </span>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+{% endif %}
+
+{% if not nunca and not atrasados %}
+<div class="text-center py-5">
+  <i class="bi bi-check-circle-fill text-success" style="font-size:4rem"></i>
+  <h4 class="text-success mt-3">Tudo em dia!</h4>
+  <p class="text-muted">Todos os kits foram conferidos nos últimos {{ dias }} dias.</p>
+</div>
+{% endif %}
+
+{% endblock %}

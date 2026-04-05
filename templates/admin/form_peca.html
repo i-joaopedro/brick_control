@@ -1,0 +1,91 @@
+﻿{% extends 'base.html' %}
+{% block title %}{{ 'Editar' if peca else 'Nova' }} Peça{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ url_for('admin.listar_pecas') }}" class="btn btn-light btn-sm me-3">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h3 class="fw-800 mb-0">
+                {{ 'Editar Peça' if peca else 'Nova Peça no Catálogo' }}
+            </h3>
+        </div>
+
+        <div class="card shadow-sm border-0 p-4">
+            <form method="POST"
+                  action="{{ url_for('admin.editar_peca', pid=peca.id) if peca else url_for('admin.nova_peca') }}"
+                  enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                {% if not peca %}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Código LEGO</label>
+                    <input type="text" name="codigo_lego" class="form-control"
+                           placeholder="Ex: 3001" required
+                           pattern="[A-Za-z0-9\-]+" title="Somente letras, números e hífens">
+                    <div class="form-text">Será usado como identificador único.</div>
+                </div>
+                {% else %}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Código LEGO</label>
+                    <input type="text" class="form-control" value="{{ peca.codigo_lego }}" disabled>
+                </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nome da Peça</label>
+                    <input type="text" name="nome" class="form-control"
+                           value="{{ peca.nome if peca else '' }}"
+                           placeholder="Ex: Bloco 2x4 Azul" required>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">
+                        Foto {{ '(deixe em branco para manter a atual)' if peca else '' }}
+                    </label>
+
+                    {# Prévia da imagem #}
+                    <div class="mb-2" id="preview-wrap"
+                         style="{{ 'display:block' if peca and peca.imagem_url != 'sem-foto.png' else 'display:none' }}">
+                        <img id="preview-img"
+                             src="{{ url_for('static', filename='uploads/' + peca.imagem_url) if peca and peca.imagem_url != 'sem-foto.png' else '' }}"
+                             class="rounded border"
+                             style="height:100px;width:100px;object-fit:contain;background:#f8f9fa;padding:4px">
+                    </div>
+
+                    <input type="file" name="foto" id="foto-input" class="form-control"
+                           accept=".png,.jpg,.jpeg,.webp"
+                           {% if not peca %}required{% endif %}>
+                    <div class="form-text">PNG, JPG ou JPEG · máx. 5 MB · fundo branco recomendado.</div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('admin.listar_pecas') }}" class="btn btn-light flex-grow-1">Cancelar</a>
+                    <button type="submit" class="btn btn-primary flex-grow-1 fw-bold">
+                        {{ 'Salvar Alterações' if peca else 'Cadastrar Peça' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('foto-input').addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    const wrap = document.getElementById('preview-wrap');
+    const img  = document.getElementById('preview-img');
+    const reader = new FileReader();
+    reader.onload = e => {
+        img.src = e.target.result;
+        wrap.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+});
+</script>
+{% endblock %}

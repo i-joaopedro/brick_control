@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Ambiente virtual
+.venv/
+venv/
+env/
+
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Banco de dados
+instance/
+*.db
+*.db-shm
+*.db-wal
+
+# Uploads de usuário (IMPORTANTE: Agora permitido para Git conforme solicitado)
+# static/uploads/  <-- Removido para permitir o versionamento de fotos
+
+# Logs e Relatórios
+*.log
+!requirements.txt
+!README.md
+!task.md
+!implementation_plan.md
+!walkthrough.md
+*.txt
+pytest_*.log
+
+# Pastas de IDE e Sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.pytest_cache/
+.gemini/
+__pycache__/
+**/__pycache__/
+
+# Arquivos temporários e scripts de manutenção
+*.tmp
+repair_templates.py
+update_templates.py
+verification/
