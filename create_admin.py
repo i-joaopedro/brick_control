@@ -8,7 +8,7 @@ load_dotenv()
 from app import app
 from extensions import db
 from models import Usuario, Role
-from helpers import _validar_senha
+from services.user_service import validar_senha
 
 
 def criar_admin():
@@ -19,7 +19,7 @@ def criar_admin():
             print(f"⚠️  Usuário '{username}' já existe.")
             return
         senha = getpass.getpass("Senha: ")
-        erro  = _validar_senha(senha)
+        erro  = validar_senha(senha)
         if erro:
             print(f"❌ {erro}")
             return
