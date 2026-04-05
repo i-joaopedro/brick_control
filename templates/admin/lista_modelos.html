@@ -1,9 +1,10 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% block title %}Modelos de Kit{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-800 mb-0">Modelos de Kit</h2>
-    {% if (current_user.role.value if current_user.is_authenticated else '') == 'admin' %}
+    {% set user_role = (current_user.role.value if current_user.is_authenticated else '') %}
+    {% if user_role in ['admin', 'auxiliar'] %}
     <a href="{{ url_for('admin.novo_modelo') }}" class="btn btn-primary btn-sm fw-semibold">
         <i class="bi bi-plus me-1"></i>Novo Modelo
     </a>
@@ -31,11 +32,13 @@
                    class="btn btn-sm btn-outline-primary flex-grow-1">
                     <i class="bi bi-list-check me-1"></i>Composição
                 </a>
-                {% if (current_user.role.value if current_user.is_authenticated else '') == 'admin' %}
+                {% if user_role in ['admin', 'auxiliar'] %}
                 <a href="{{ url_for('admin.editar_modelo', mid=m.id) }}"
                    class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-pencil"></i>
                 </a>
+                {% endif %}
+                {% if user_role == 'admin' %}
                 <form method="POST" action="{{ url_for('admin.deletar_modelo', mid=m.id) }}"
                       class="d-inline"
                       onsubmit="return confirm('Deletar modelo {{ m.nome }}?')">

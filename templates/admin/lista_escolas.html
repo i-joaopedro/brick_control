@@ -9,12 +9,32 @@
     <h2 class="fw-800 mb-0">Escolas</h2>
     <p class="text-muted small mb-0">Gestão de unidades escolares e seus kits</p>
   </div>
-  {% if is_admin %}
-  <a href="{{ url_for('admin.nova_escola') }}" class="btn btn-primary btn-sm fw-semibold">
-    <i class="bi bi-plus me-1"></i>Nova Escola
-  </a>
-  {% endif %}
+    {% if is_admin %}
+    <a href="{{ url_for('admin.nova_escola') }}" class="btn btn-primary btn-sm fw-semibold">
+      <i class="bi bi-plus me-1"></i>Nova Escola
+    </a>
+    {% endif %}
+  </div>
 </div>
+
+{# FILTRO POR CIDADE #}
+{% if cidades %}
+<div class="mb-4">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <span class="text-muted small fw-bold me-2"><i class="bi bi-filter me-1"></i>CIDADE:</span>
+    <a href="{{ url_for('admin.lista_escolas') }}" 
+       class="btn btn-sm {% if not cidade_atual %}btn-dark{% else %}btn-outline-dark{% endif %} rounded-pill px-3">
+      Todas
+    </a>
+    {% for c in cidades %}
+    <a href="{{ url_for('admin.lista_escolas', cidade=c) }}" 
+       class="btn btn-sm {% if cidade_atual == c %}btn-dark{% else %}btn-outline-dark{% endif %} rounded-pill px-3">
+      {{ c }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 {% if escolas_obj %}
 <div class="row g-3">
@@ -65,8 +85,8 @@
         {% if st.total > 0 %}
         {% set pct = (st.completos/st.total*100)|round(0)|int %}
         <div class="progress mb-3" style="height: 6px; border-radius: 8px;">
-          <div class="progress-bar {% if saude is not none and saude >= 85 %}bg-success{% elif saude is not none and saude >= 60 %}bg-warning{% else %}bg-danger{% endif %}"
-               {{ 'style="width:' ~ pct ~ '%"'|safe }}></div>
+          <div class="progress-bar {% if pct >= 85 %}bg-success{% elif pct >= 60 %}bg-warning{% else %}bg-danger{% endif %}"
+               style="width: {{ pct }}%"></div>
         </div>
         {% endif %}
 

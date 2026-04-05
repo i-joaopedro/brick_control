@@ -3,7 +3,9 @@ Modelos do banco de dados e enums do sistema.
 """
 import enum
 from datetime import datetime, timezone
+from itsdangerous import URLSafeTimedSerializer as Serializer
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask import current_app
 from flask_login import UserMixin
 from extensions import db
 
@@ -31,6 +33,29 @@ class StatusConferencia(str, enum.Enum):
 # ─────────────────────────────────────────────
 #  MODELOS
 # ─────────────────────────────────────────────
+class Escola(db.Model):
+    __tablename__ = 'escolas'
+    id          = db.Column(db.Integer, primary_key=True)
+    nome        = db.Column(db.String(100), unique=True, nullable=False)
+    cidade      = db.Column(db.String(100))
+    responsavel = db.Column(db.String(100))
+    telefone    = db.Column(db.String(30))
+    ativo       = db.Column(db.Boolean, default=True)
+    criado_em   = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    @property
+    def saude_media(self):
+        """Média da saúde de todos os kits desta escola."""
+        from models import KitUnidade
+        kits = KitUnidade.query.filter_by(escola=self.nome).all()
+        if not kits: 
+            return None
+        saude_vals = [k.saude_percentual for k in kits if k.saude_percentual is not None]
+        if not saude_vals:
+            return 0
+        return round(sum(saude_vals) / len(saude_vals), 1)
+
+
 class Usuario(db.Model, UserMixin):
     __tablename__ = 'usuarios'
     id            = db.Column(db.Integer, primary_key=True)
@@ -51,130 +76,102 @@ class Usuario(db.Model, UserMixin):
     def nome_display(self):
         return self.nome_exibicao or self.username
 
+    def get_reset_token(self):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        return s.dumps({'user_id': self.id}, salt='password-reset-salt')
+
+    @staticmethod
+    def verify_reset_token(token, expires_sec=1800):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            user_id = s.loads(token, salt='password-reset-salt', max_age=expires_sec)['user_id']
+        except:
+            return None
+        return Usuario.query.get(user_id)
+
 
 class Peca(db.Model):
     __tablename__ = 'pecas'
     id          = db.Column(db.Integer, primary_key=True)
     codigo_lego = db.Column(db.String(50), unique=True, nullable=False)
     nome        = db.Column(db.String(100), nullable=False)
-    imagem_url  = db.Column(db.String(255), default='sem-foto.png')
-    composicoes = db.relationship('ComposicaoKit', backref='peca',
-                                  cascade='all, delete-orphan', lazy=True)
+    imagem_url  = db.Column(db.String(255))
 
 
 class KitModelo(db.Model):
-    __tablename__      = 'kit_modelos'
-    id                 = db.Column(db.Integer, primary_key=True)
-    nome               = db.Column(db.String(100), nullable=False)
-    categoria          = db.Column(db.String(50))
-    foto_capa          = db.Column(db.String(255), default='kit-default.png')
-    pecas_obrigatorias = db.relationship('ComposicaoKit', backref='kit_modelo',
-                                         cascade='all, delete-orphan', lazy=True)
-    unidades_reais     = db.relationship('KitUnidade', backref='modelo',
-                                         cascade='all, delete-orphan', lazy=True)
+    __tablename__ = 'kit_modelos'
+    id        = db.Column(db.Integer, primary_key=True)
+    nome      = db.Column(db.String(100), nullable=False)
+    categoria = db.Column(db.String(50))
+    foto_capa = db.Column(db.String(255))
 
 
 class ComposicaoKit(db.Model):
-    __tablename__       = 'composicao_kits'
+    __tablename__ = 'composicao_kits'
     id                  = db.Column(db.Integer, primary_key=True)
-    kit_modelo_id       = db.Column(db.Integer, db.ForeignKey('kit_modelos.id'))
-    peca_id             = db.Column(db.Integer, db.ForeignKey('pecas.id'))
-    quantidade_esperada = db.Column(db.Integer, nullable=False, default=1)
+    kit_modelo_id       = db.Column(db.Integer, db.ForeignKey('kit_modelos.id'), nullable=False)
+    peca_id             = db.Column(db.Integer, db.ForeignKey('pecas.id'), nullable=False)
+    quantidade_esperada = db.Column(db.Integer, nullable=False)
+
+    modelo = db.relationship('KitModelo', backref=db.backref('pecas_obrigatorias', lazy=True, cascade="all, delete-orphan"))
+    peca   = db.relationship('Peca')
 
 
 class KitUnidade(db.Model):
     __tablename__ = 'kit_unidades'
-    __table_args__ = (
-        db.Index('ix_kit_unidades_escola', 'escola'),
-        db.Index('ix_kit_unidades_status', 'status_atual'),
-    )
-    id            = db.Column(db.Integer, primary_key=True)
-    identificador = db.Column(db.String(50), nullable=False)
-    kit_modelo_id = db.Column(db.Integer, db.ForeignKey('kit_modelos.id'))
-    escola        = db.Column(db.String(100), default='Laboratório Central')
-    status_atual  = db.Column(db.Enum(StatusKit), default=StatusKit.pendente)
-    conferencias  = db.relationship('Conferencia', backref='unidade',
-                                    cascade='all, delete-orphan',
-                                    lazy='subquery',
-                                    order_by='Conferencia.data_conferencia.desc()')
+    id              = db.Column(db.Integer, primary_key=True)
+    identificador   = db.Column(db.String(50), nullable=False)
+    kit_modelo_id   = db.Column(db.Integer, db.ForeignKey('kit_modelos.id'), nullable=False)
+    escola          = db.Column(db.String(100))
+    status_atual    = db.Column(db.Enum(StatusKit), default=StatusKit.pendente)
+
+    modelo = db.relationship('KitModelo', backref=db.backref('unidades_reais', lazy=True))
 
     @property
     def ultima_conferencia(self):
-        return self.conferencias[0] if self.conferencias else None
+        if not self.historico_conferencias:
+            return None
+        # Ordena por data decrescente
+        return sorted(self.historico_conferencias, key=lambda c: c.data_conferencia, reverse=True)[0]
 
     @property
     def saude_percentual(self):
-        uc = self.ultima_conferencia
-        if not uc or not uc.detalhes: return None
-        esp = sum(d.quantidade_esperada_na_epoca for d in uc.detalhes)
-        enc = sum(d.quantidade_encontrada for d in uc.detalhes)
-        return round(enc / esp * 100, 1) if esp else 100.0
+        conf = self.ultima_conferencia
+        if not conf:
+            return 100 if self.status_atual == StatusKit.completo else 0
+        
+        detalhes = conf.detalhes
+        if not detalhes:
+            return 100
+            
+        total_esperado = sum(d.quantidade_esperada_na_epoca or 0 for d in detalhes)
+        if total_esperado == 0:
+            return 100
+            
+        total_encontrado = sum(d.quantidade_encontrada or 0 for d in detalhes)
+        return int((total_encontrado / total_esperado) * 100)
 
 
 class Conferencia(db.Model):
     __tablename__ = 'conferencias'
-    __table_args__ = (
-        db.Index('ix_conferencias_kit_id', 'kit_unidade_id'),
-        db.Index('ix_conferencias_data', 'data_conferencia'),
-    )
-    id               = db.Column(db.Integer, primary_key=True)
-    kit_unidade_id   = db.Column(db.Integer, db.ForeignKey('kit_unidades.id'))
+    id             = db.Column(db.Integer, primary_key=True)
+    kit_unidade_id = db.Column(db.Integer, db.ForeignKey('kit_unidades.id'), nullable=False)
     data_conferencia = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    responsavel      = db.Column(db.String(100))
-    observacoes      = db.Column(db.Text)
-    status_resultado = db.Column(db.Enum(StatusConferencia), nullable=True)
-    detalhes         = db.relationship('ConferenciaDetalhe', backref='conferencia',
-                                       cascade='all, delete-orphan', lazy='subquery')
+    responsavel    = db.Column(db.String(100))
+    observacoes    = db.Column(db.Text)
+    status_resultado = db.Column(db.Enum(StatusConferencia), default=StatusConferencia.incompleto)
+
+    unidade = db.relationship('KitUnidade', backref=db.backref('historico_conferencias', lazy=True))
 
 
 class ConferenciaDetalhe(db.Model):
-    __tablename__                = 'conferencia_detalhes'
-    id                           = db.Column(db.Integer, primary_key=True)
-    conferencia_id               = db.Column(db.Integer, db.ForeignKey('conferencias.id'))
-    peca_id                      = db.Column(db.Integer, db.ForeignKey('pecas.id'))
+    __tablename__ = 'conferencia_detalhes'
+    id             = db.Column(db.Integer, primary_key=True)
+    conferencia_id = db.Column(db.Integer, db.ForeignKey('conferencias.id'), nullable=False)
+    peca_id        = db.Column(db.Integer, db.ForeignKey('pecas.id'), nullable=False)
     quantidade_esperada_na_epoca = db.Column(db.Integer)
-    quantidade_encontrada        = db.Column(db.Integer, nullable=False)
-    observacao_peca              = db.Column(db.String(200), nullable=True)
-    peca                         = db.relationship('Peca')
+    quantidade_encontrada        = db.Column(db.Integer, default=0, nullable=False)
+    observacao_peca              = db.Column(db.String(200))
 
-
-class Escola(db.Model):
-    __tablename__ = 'escolas'
-    id          = db.Column(db.Integer, primary_key=True)
-    nome        = db.Column(db.String(100), unique=True, nullable=False)
-    cidade      = db.Column(db.String(100))
-    responsavel = db.Column(db.String(100))
-    telefone    = db.Column(db.String(30))
-    ativo       = db.Column(db.Boolean, default=True)
-    criado_em   = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-
-    @property
-    def total_kits(self):
-        return KitUnidade.query.filter_by(escola=self.nome).count()
-
-    @property
-    def kits_completos(self):
-        return KitUnidade.query.filter_by(escola=self.nome, status_atual=StatusKit.completo).count()
-
-    @property
-    def saude_media(self):
-        ultima_sq = (
-            db.session.query(db.func.max(Conferencia.id).label('cid'))
-            .join(KitUnidade, KitUnidade.id == Conferencia.kit_unidade_id)
-            .filter(KitUnidade.escola == self.nome)
-            .group_by(Conferencia.kit_unidade_id)
-            .subquery()
-        )
-        row = (
-            db.session.query(
-                db.func.avg(
-                    db.cast(ConferenciaDetalhe.quantidade_encontrada, db.Float) /
-                    db.func.nullif(ConferenciaDetalhe.quantidade_esperada_na_epoca, 0) * 100
-                )
-            )
-            .join(Conferencia, Conferencia.id == ConferenciaDetalhe.conferencia_id)
-            .filter(Conferencia.id.in_(db.session.query(ultima_sq.c.cid)))
-            .one_or_none()
-        )
-        val = row[0] if row and row[0] is not None else None
-        return round(val, 1) if val is not None else None
+    conferencia = db.relationship('Conferencia', backref=db.backref('detalhes', lazy=True, cascade="all, delete-orphan"))
+    peca        = db.relationship('Peca')

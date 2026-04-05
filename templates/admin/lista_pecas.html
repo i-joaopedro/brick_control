@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% block title %}Catálogo de Peças{% endblock %}
 
 {% block content %}
@@ -7,7 +7,8 @@
         <h2 class="fw-800 mb-0">Catálogo de Peças</h2>
         <p class="text-muted small mb-0">{{ pecas.total }} peças cadastradas</p>
     </div>
-    {% if (current_user.role.value if current_user.is_authenticated else '') == 'admin' %}
+    {% set user_role = (current_user.role.value if current_user.is_authenticated else '') %}
+    {% if user_role in ['admin', 'auxiliar'] %}
     <a href="{{ url_for('admin.nova_peca') }}" class="btn btn-primary btn-sm fw-semibold">
         <i class="bi bi-plus-circle me-1"></i>Nova Peça
     </a>
@@ -38,12 +39,14 @@
             <h6 class="fw-bold mb-0 small text-truncate">{{ p.nome }}</h6>
             <code class="small text-muted">{{ p.codigo_lego }}</code>
 
-            {% if (current_user.role.value if current_user.is_authenticated else '') == 'admin' %}
             <div class="d-flex gap-1 mt-auto pt-2 justify-content-center">
+                {% if user_role in ['admin', 'auxiliar'] %}
                 <a href="{{ url_for('admin.editar_peca', pid=p.id) }}"
                    class="btn btn-sm btn-outline-secondary px-2" style="width:auto">
                     <i class="bi bi-pencil"></i>
                 </a>
+                {% endif %}
+                {% if user_role == 'admin' %}
                 <form method="POST" action="{{ url_for('admin.deletar_peca', pid=p.id) }}"
                       onsubmit="return confirm('Remover {{ p.nome }}?')" class="d-inline">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

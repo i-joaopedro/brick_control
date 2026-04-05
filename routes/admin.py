@@ -197,19 +197,37 @@ def deletar_usuario(uid):
 @bp.route('/admin/escolas')
 @login_required(roles=['admin', 'pedagogo'])
 def lista_escolas():
-    user   = usuario_atual()
-    acesso = escolas_do_usuario(user)
+    user          = usuario_atual()
+    acesso        = escolas_do_usuario(user)
+    cidade_filtro = request.args.get('cidade', '').strip()
+
+    # Base query
+    query = Escola.query
     if acesso:
-        escolas_obj = Escola.query.filter(Escola.nome.in_(acesso)).order_by(Escola.nome).all()
-    else:
-        escolas_obj = Escola.query.order_by(Escola.nome).all()
+        query = query.filter(Escola.nome.in_(acesso))
+    
+    # Todas as cidades antes de filtrar para a barra lateral/topo
+    escolas_acesso = query.all()
+    cidades = sorted({e.cidade for e in escolas_acesso if e.cidade})
+
+    # Aplica filtro se selecionado
+    if cidade_filtro:
+        query = query.filter_by(cidade=cidade_filtro)
+    
+    escolas_obj = query.order_by(Escola.nome).all()
+
     escolas_raw = db.session.query(
         KitUnidade.escola,
         db.func.count(KitUnidade.id).label('total'),
         db.func.sum(db.case((KitUnidade.status_atual == StatusKit.completo, 1), else_=0)).label('completos')
     ).group_by(KitUnidade.escola).all()
     stats = {e[0]: {'total': e[1], 'completos': e[2] or 0} for e in escolas_raw}
-    return render_template('admin/lista_escolas.html', escolas_obj=escolas_obj, stats=stats)
+    
+    return render_template('admin/lista_escolas.html', 
+                           escolas_obj=escolas_obj, 
+                           stats=stats,
+                           cidades=cidades,
+                           cidade_atual=cidade_filtro)
 
 
 @bp.route('/admin/escola/nova', methods=['GET', 'POST'])
@@ -297,7 +315,7 @@ def listar_pecas():
 
 
 @bp.route('/admin/pecas/novo', methods=['GET', 'POST'])
-@login_required(roles='admin')
+@login_required(roles=['admin', 'auxiliar'])
 def nova_peca():
     if request.method == 'POST':
         codigo  = request.form.get('codigo_lego', '').strip()
@@ -321,7 +339,7 @@ def nova_peca():
 
 
 @bp.route('/admin/pecas/<int:pid>/editar', methods=['GET', 'POST'])
-@login_required(roles='admin')
+@login_required(roles=['admin', 'auxiliar'])
 def editar_peca(pid):
     peca    = db.get_or_404(Peca, pid)
     if request.method == 'POST':
@@ -359,13 +377,13 @@ def deletar_peca(pid):
 
 # ─── MODELOS DE KIT ───────────────────────────
 @bp.route('/admin/modelos')
-@login_required(roles=['admin', 'pedagogo'])
+@login_required(roles=['admin', 'pedagogo', 'auxiliar'])
 def listar_modelos():
     return render_template('admin/lista_modelos.html', modelos=KitModelo.query.all())
 
 
 @bp.route('/admin/modelo/novo', methods=['GET', 'POST'])
-@login_required(roles='admin')
+@login_required(roles=['admin', 'auxiliar'])
 def novo_modelo():
     if request.method == 'POST':
         nome = request.form.get('nome', '').strip()
@@ -385,7 +403,7 @@ def novo_modelo():
 
 
 @bp.route('/admin/modelo/<int:mid>/editar', methods=['GET', 'POST'])
-@login_required(roles='admin')
+@login_required(roles=['admin', 'auxiliar'])
 def editar_modelo(mid):
     modelo = db.get_or_404(KitModelo, mid)
     if request.method == 'POST':
@@ -416,7 +434,7 @@ def deletar_modelo(mid):
 
 
 @bp.route('/admin/modelo/<int:modelo_id>/composicao', methods=['GET', 'POST'])
-@login_required(roles='admin')
+@login_required(roles=['admin', 'auxiliar'])
 def gerenciar_composicao(modelo_id):
     modelo         = db.get_or_404(KitModelo, modelo_id)
     pecas_catalogo = Peca.query.order_by(Peca.nome).all()
@@ -443,7 +461,7 @@ def gerenciar_composicao(modelo_id):
 
 
 @bp.route('/admin/composicao/remover/<int:item_id>', methods=['POST'])
-@login_required(roles='admin')
+@login_required(roles=['admin', 'auxiliar'])
 def remover_item_composicao(item_id):
     item      = db.get_or_404(ComposicaoKit, item_id)
     modelo_id = item.kit_modelo_id
@@ -454,7 +472,7 @@ def remover_item_composicao(item_id):
 
 
 @bp.route('/api/composicao/<int:item_id>/quantidade', methods=['POST'])
-@login_required(roles='admin')
+@login_required(roles=['admin', 'auxiliar'])
 def ajax_quantidade_composicao(item_id):
     item  = db.get_or_404(ComposicaoKit, item_id)
     delta = request.get_json(silent=True, force=True) or {}

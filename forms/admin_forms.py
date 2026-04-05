@@ -36,5 +36,5 @@ class ModeloForm(FlaskForm):
 class KitUnidadeForm(FlaskForm):
     identificador = StringField('Identificador da Unidade', validators=[DataRequired()])
     escola = StringField('Escola', validators=[DataRequired()])
-    modelo_id = SelectField('Modelo', coerce=int, validators=[DataRequired()])
+    kit_modelo_id = SelectField('Modelo', coerce=int, validators=[DataRequired()])
     submit = SubmitField('Salvar')

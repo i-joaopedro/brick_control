@@ -395,6 +395,14 @@
             </li>
             <li class="nav-item">
               <a
+                class="nav-link text-white {% if request.endpoint == 'admin.listar_modelos' %}active{% endif %}"
+                href="{{ url_for('admin.listar_modelos') }}"
+              >
+                <i class="bi bi-layers me-1"></i>Modelos
+              </a>
+            </li>
+            <li class="nav-item">
+              <a
                 class="nav-link text-white {% if request.endpoint == 'admin.listar_pecas' %}active{% endif %}"
                 href="{{ url_for('admin.listar_pecas') }}"
               >
@@ -463,24 +471,34 @@
                 href="#"
                 data-bs-toggle="dropdown"
               >
-                <i class="bi bi-puzzle me-1"></i>Catálogo
+                <i class="bi bi-layers me-1"></i>Catálogo
               </a>
               <ul class="dropdown-menu shadow-sm">
                 <li>
-                  <a
-                    class="dropdown-item {% if request.endpoint == 'admin.listar_pecas' %}active{% endif %}"
-                    href="{{ url_for('admin.listar_pecas') }}"
-                  >
-                    <i class="bi bi-puzzle me-2"></i>Peças
+                  <a class="dropdown-item" href="{{ url_for('admin.listar_pecas') }}">
+                    <i class="bi bi-puzzle me-2"></i>Ver Peças
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('admin.nova_peca') }}">
+                    <i class="bi bi-plus-circle me-2"></i>Nova Peça
                   </a>
                 </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
-                  <a
-                    class="dropdown-item {% if request.endpoint == 'admin.nova_unidade' %}active{% endif %}"
-                    href="{{ url_for('admin.nova_unidade') }}"
-                  >
-                    <i class="bi bi-plus-circle me-2"></i>Nova Unidade
+                  <a class="dropdown-item" href="{{ url_for('admin.listar_modelos') }}">
+                    <i class="bi bi-layers me-2"></i>Modelos de Kit
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('admin.novo_modelo') }}">
+                    <i class="bi bi-plus-circle me-2"></i>Novo Modelo
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('admin.nova_unidade') }}">
+                    <i class="bi bi-plus-circle me-2"></i>Nova Unidade (Física)
                   </a>
                 </li>
               </ul>

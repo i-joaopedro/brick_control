@@ -11,7 +11,7 @@ load_dotenv()
 
 from flask import Flask, render_template, request, redirect, url_for, flash
 
-from extensions import db, migrate, csrf, limiter, login_manager
+from extensions import db, migrate, csrf, limiter, login_manager, mail
 
 
 def create_app(test_config=None):
@@ -33,6 +33,14 @@ def create_app(test_config=None):
     app.config['WTF_CSRF_ENABLED']            = True
     app.config['PERMANENT_SESSION_LIFETIME']  = timedelta(hours=8)
 
+    # Configuração de E-mail
+    app.config['MAIL_SERVER']   = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+    app.config['MAIL_PORT']     = int(os.environ.get('MAIL_PORT', 587))
+    app.config['MAIL_USE_TLS']  = os.environ.get('MAIL_USE_TLS', 'true').lower() == 'true'
+    app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+    app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+    app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
+
     # Sobrescreve com config de teste, se fornecido
     if test_config:
         app.config.update(test_config)
@@ -49,6 +57,8 @@ def create_app(test_config=None):
     csrf.init_app(app)
     limiter.init_app(app)
     login_manager.init_app(app)
+    mail.init_app(app)
+    
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Faça login para acessar esta página.'
     login_manager.login_message_category = 'warning'
@@ -77,9 +87,6 @@ def create_app(test_config=None):
     app.register_blueprint(auxiliar_bp)
     app.register_blueprint(relatorios_bp)
     app.register_blueprint(errors_bp)
-
-    # ── Error handlers ────────────────────────
-    # Handlers transferidos para routes/errors.py
 
     @app.errorhandler(413)
     def too_large(e):
