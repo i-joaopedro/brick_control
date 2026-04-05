@@ -28,14 +28,15 @@ instance/
 # static/uploads/  <-- Removido para permitir o versionamento de fotos
 
 # Logs e Relatórios
+*.txt
 *.log
+pytest_*.log
+
 !requirements.txt
 !README.md
 !task.md
 !implementation_plan.md
 !walkthrough.md
-*.txt
-pytest_*.log
 
 # Pastas de IDE e Sistema
 .vscode/
